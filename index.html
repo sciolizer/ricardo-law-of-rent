@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ricardian Law of Rent Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        #chart-container {
+            width: 80%;
+            height: auto;
+        }
+
+        canvas {
+            background-color: #fff;
+        }
+
+        .slider {
+            width: 50%;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="chart-container">
+        <canvas id="incomeChart"></canvas>
+    </div>
+    <input type="range" min="0" max="4" step="1" value="0" class="slider" id="progressSlider">
+    <label for="progressSlider">City size</label>
+
+    <script>
+        const ctx = document.getElementById('incomeChart').getContext('2d');
+        const baseIncomeStep = 10000;
+        let currentSliderValue = 0; // Slider starts all the way to the left
+
+        function generateData(marginOfProduction) {
+            let labels = [];
+            let keptIncomes = [];
+            let rents = [];
+            for (let income = 0; income <= 200000; income += baseIncomeStep) {
+                if (income < marginOfProduction || income > 200000 - marginOfProduction) {
+                    // Placeholder bars with zero height
+                    keptIncomes.push(0);
+                    rents.push(0);
+                } else {
+                    keptIncomes.push(marginOfProduction); // Kept income equal to margin of production
+                    rents.push(income - marginOfProduction);
+                }
+                labels.push(income); // Always populate labels to fix the x-axis scaling
+            }
+            return { labels, datasets: [{ label: 'Kept income', data: keptIncomes, backgroundColor: 'rgba(54, 162, 235, 0.5)' }, { label: 'Location rent', data: rents, backgroundColor: 'rgba(255, 99, 132, 0.5)' }] };
+        }
+
+        let chartData = generateData(50000);
+        const chart = new Chart(ctx, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Productive capacity' },
+                        stacked: true
+                    },
+                    y: {
+                        title: { display: true, text: 'Total income' },
+                        beginAtZero: true,
+                        max: 200000, // Fixed y-axis range
+                        stacked: true
+                    }
+                },
+                plugins: {
+                    tooltip: {},
+                    legend: { position: 'right' }
+                }
+            }
+        });
+
+        document.getElementById('progressSlider').addEventListener('input', function (e) {
+            const newSliderValue = parseInt(e.target.value);
+            const marginOfProduction = 50000 - newSliderValue * 10000; // Reduces margin with each slide to the right
+            chartData = generateData(marginOfProduction);
+            chart.data.labels = chartData.labels;
+            chart.data.datasets[0].data = chartData.datasets[0].data;
+            chart.data.datasets[1].data = chartData.datasets[1].data;
+            chart.update();
+        });
+    </script>
+
+    <p>Why is the rent so high?
+    </p>
+    <p>When you rent a building to run a business, you are renting two things:
+        the use of the building, and the location in which it is built. A coffee shop in the middle
+        of a bustling city takes in more revenue than one in the outskirts, and so its location is
+        more valuable.
+    </p>
+    <p>
+        How much of the bustling coffee shop's revenue will end up going to rent? As much as a landlord
+        can get away with. If the landlord goes too high, then the coffee shop will move to a different location.
+        Even the outskirts will be better than the center of the city if the rent is too high.
+        But so long as the coffee shop can still keep slightly more of its profits than it would make
+        in the outskirts, it will stay and deal with the high rent.
+    </p>
+    <p>
+        This is <a href="https://en.wikipedia.org/wiki/Law_of_rent">Ricardo's law of rent</a>: rent is the difference in
+        productive capacity between the chosen
+        location and the worst location. To some extent, it doesn't matter what location the coffee
+        shop chooses. Any excess profits they would have gained from a better location just go to the landlord,
+        and so their "kept income" stays the same.
+    </p>
+    <p>
+        But it gets worse. As a city grows, two things happen: the outskirts move further and further
+        out, and the best locations become more and more valuable. Slide the "City size" to see these
+        effects on our graph. The "outskirts moving further out" is represented by adding a bar to
+        the left, and "the best locations become more valuable" is represented by adding a bar to
+        the right.
+    </p>
+    <p>
+        The leftmost bar represents the worst location our coffee shop could be. It also, according
+        to Ricardo's law of rent, dictates how much of its profits it can keep for itself. When the
+        worst location is replaced by an even worse location, kept profits decrease across the
+        board. Our coffee shop keeps fewer profits over time, no matter where they are located.
+    </p>
+    <p>
+        As society progresses, the blue shrinks, and the pink grows. Progress is a wedge that increases
+        the divide in wealth between the land owners and the landless. Progress is the cause of poverty!
+    </p>
+    <p>
+        Fortunately, <a href="https://en.wikipedia.org/wiki/Land_value_tax">there is a fix</a>.
+    </p>
+</body>
+
+</html>
