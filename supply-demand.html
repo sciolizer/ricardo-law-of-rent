@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Tax on Sellers Graph</title>
+    <style>
+        .legend {
+            margin-top: 10px;
+        }
+
+        .legend span {
+            display: inline-block;
+            width: 20px;
+            height: 10px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="myCanvas" width="600" height="400"></canvas>
+    <div class="legend">
+        <span style="background-color: blue;"></span>Free Market Supply
+        <span style="background-color: red;"></span>Taxed Supply
+        <span style="background-color: green;"></span>Demand
+    </div>
+    <br>
+    <label for="taxRate">Tax Rate:</label>
+    <input type="range" id="taxRate" min="0" max="100" value="50" step="1">
+    <br>
+    <label for="elasticity">Supply Elasticity:</label>
+    <input type="range" id="elasticity" min="0" max="100" value="100" step="1">
+    <script>
+        const canvas = document.getElementById('myCanvas');
+        const ctx = canvas.getContext('2d');
+        const taxRateSlider = document.getElementById('taxRate');
+        const elasticitySlider = document.getElementById('elasticity');
+
+        // Set up the canvas
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const padding = 60;
+        const graphWidth = canvasWidth - 2 * padding;
+        const graphHeight = canvasHeight - 2 * padding;
+
+        // Set up the supply and demand curves
+        let demand = [{ x: 0, y: 100 }, { x: 100, y: 0 }];
+
+        function drawGraph() {
+            // Clear the canvas
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+            // Draw the axes
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvasHeight - padding);
+            ctx.lineTo(canvasWidth - padding, canvasHeight - padding);
+            ctx.stroke();
+
+            // Apply transforms to invert the y-axis
+            ctx.translate(padding, canvasHeight - padding);
+            ctx.scale(1, -1);
+
+            // Calculate the free market supply curve based on elasticity
+            const elasticity = elasticitySlider.value / 100;
+            const xAtNoProfit = 50 - elasticity * 50;
+            const freeMarketSupply = [{ x: xAtNoProfit, y: 0 }, { x: 50 + elasticity * 50, y: 100 }];
+            drawCurve(freeMarketSupply, 'blue');
+
+            // Draw the demand curve
+            drawCurve(demand, 'green');
+
+            // Calculate and draw the taxed supply curve
+            const taxRate = taxRateSlider.value / 100;
+            const taxedSupply = freeMarketSupply.map(point => ({
+                x: (point.x - xAtNoProfit) * (1 - taxRate) + xAtNoProfit,
+                y: point.y
+            }));
+            drawCurve(taxedSupply, 'red');
+
+            // Calculate and display intersection points and labels
+            const freeMarketIntersection = getIntersection(freeMarketSupply, demand);
+            const taxedIntersection = getIntersection(taxedSupply, demand);
+
+            let producerRevenue = getYValue(freeMarketSupply, taxedIntersection.x);
+            if (elasticity == 0) {
+                // pretend elasticity == 0.01; the proper solution would be to calculate the limit as elasticity approaches 0
+                const xAtNoProfit = 50 - 0.01 * 50;
+                const freeMarketSupply = [{ x: xAtNoProfit, y: 0 }, { x: 50 + 0.01 * 50, y: 100 }];
+                const taxedSupply = freeMarketSupply.map(point => ({
+                    x: (point.x - xAtNoProfit) * (1 - taxRate) + xAtNoProfit,
+                    y: point.y
+                }));
+                const taxedIntersection = getIntersection(taxedSupply, demand);
+                producerRevenue = getYValue(freeMarketSupply, taxedIntersection.x);
+            }
+
+            drawIntersectionLines(freeMarketIntersection, 'Free Market Quantity', null, 0);
+            drawIntersectionLines(taxedIntersection, 'Taxed Quantity', 'Consumer Price', 20);
+            drawProducerRevenueLine(taxedIntersection.x, producerRevenue, 40);
+            drawTaxRevenueLine(producerRevenue, taxedIntersection.y, -5);
+
+            // Reset the canvas transforms
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }
+
+        function drawCurve(points, color) {
+            ctx.beginPath();
+            ctx.moveTo(getX(points[0].x), getY(points[0].y));
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(getX(points[i].x), getY(points[i].y));
+            }
+            ctx.strokeStyle = color;
+            ctx.stroke();
+        }
+
+        function drawIntersectionLines(point, xLabel, yLabel, offset) {
+            ctx.beginPath();
+            ctx.moveTo(getX(point.x), 0);
+            ctx.lineTo(getX(point.x), getY(point.y));
+            ctx.strokeStyle = 'gray';
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            if (yLabel) {
+                ctx.beginPath();
+                ctx.moveTo(0, getY(point.y));
+                ctx.lineTo(getX(point.x), getY(point.y));
+                ctx.strokeStyle = 'gray';
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.fillStyle = 'black';
+            ctx.textAlign = 'center';
+            ctx.fillText(xLabel, getX(point.x) + padding, canvasHeight - 10 - offset);
+
+            if (yLabel) {
+                ctx.save();
+                ctx.translate(padding - 30, canvasHeight - getY(point.y) - padding);
+                ctx.rotate(-Math.PI / 2);
+                ctx.textAlign = 'center';
+                ctx.fillText(yLabel, 0, 0);
+                ctx.restore();
+            }
+
+            ctx.setTransform(1, 0, 0, -1, padding, canvasHeight - padding);
+        }
+
+        function drawProducerRevenueLine(x, y, xOffset) {
+            ctx.beginPath();
+            ctx.moveTo(0, getY(y));
+            ctx.lineTo(getX(x), getY(y));
+            ctx.strokeStyle = 'gray';
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.save();
+            ctx.translate(padding - 10 - xOffset, canvasHeight - getY(y) - padding);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.fillText('Producer Revenue', 0, 0);
+            ctx.restore();
+            ctx.setTransform(1, 0, 0, -1, padding, canvasHeight - padding);
+        }
+
+        function drawTaxRevenueLine(y1, y2, xOffset) {
+            ctx.beginPath();
+            ctx.moveTo(-20, getY(y1));
+            ctx.lineTo(-20, getY(y2));
+            ctx.strokeStyle = 'black';
+            ctx.stroke();
+
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.save();
+            ctx.translate(padding - 10 - xOffset, canvasHeight - (getY(y1) + getY(y2)) / 2 - padding);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.fillText('Tax Revenue', 0, 0);
+            ctx.restore();
+            ctx.setTransform(1, 0, 0, -1, padding, canvasHeight - padding);
+
+            ctx.beginPath();
+            ctx.moveTo(-23, getY(y1));
+            ctx.lineTo(-17, getY(y1));
+            ctx.moveTo(-23, getY(y2));
+            ctx.lineTo(-17, getY(y2));
+            ctx.stroke();
+        }
+
+        function getX(x) {
+            return (x / 100) * graphWidth;
+        }
+
+        function getY(y) {
+            return (y / 100) * graphHeight;
+        }
+
+        function getIntersection(curve1, curve2) {
+            const x1 = curve1[0].x;
+            const y1 = curve1[0].y;
+            const x2 = curve1[1].x;
+            const y2 = curve1[1].y;
+            const x3 = curve2[0].x;
+            const y3 = curve2[0].y;
+            const x4 = curve2[1].x;
+            const y4 = curve2[1].y;
+
+            const denom = ((y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1));
+            if (denom === 0) {
+                // Handle the case of vertical lines
+                const x = x1;
+                const y = y3;
+                return { x, y };
+            }
+
+            const ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom;
+
+            const x = x1 + ua * (x2 - x1);
+            const y = y1 + ua * (y2 - y1);
+
+            return { x, y };
+        }
+
+        function getYValue(curve, x) {
+            const x1 = curve[0].x;
+            const y1 = curve[0].y;
+            const x2 = curve[1].x;
+            const y2 = curve[1].y;
+
+            const slope = (y2 - y1) / (x2 - x1);
+            const yIntercept = y1 - slope * x1;
+
+            return slope * x + yIntercept;
+        }
+
+        taxRateSlider.addEventListener('input', drawGraph);
+        elasticitySlider.addEventListener('input', drawGraph);
+        drawGraph();
+    </script>
+</body>
+
+</html>
