@@ -1,0 +1,6 @@
+.aider*
+
+# Claude api key
+.env
+
+/ignored
